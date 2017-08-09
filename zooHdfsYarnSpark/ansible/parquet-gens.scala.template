@@ -1,0 +1,44 @@
+//usage : spark-shell   --driver-memory 10G --executor-memory 15G --executor-cores 8 -i parquetGens.scala
+
+   // import Spark SQL
+  import org.apache.spark.sql._
+  import org.apache.spark.sql.types._
+  import org.apache.spark.sql.SparkSession
+  import org.apache.hadoop.fs._
+
+  import spark.implicits._
+
+    val schemaRegion = StructType(Array(StructField("r_regionkey",IntegerType,true), StructField("r_name",StringType,true), StructField("r_comment",StringType,true)))
+    val df = spark.read.schema(schemaRegion).option("header","false").option("delimiter","|").csv("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/rawData/region/*")
+    df.write.parquet("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/parquet/region")
+  
+    val schemaNation = StructType(Array( StructField("n_nationkey",IntegerType,true),StructField("n_name",StringType,true), StructField("n_regionkey",IntegerType,true),  StructField("n_comment",StringType,true)))
+    val nationDF = spark.read.schema(schemaNation).option("header","false").option("delimiter","|").csv("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/rawData/nation/*")
+       nationDF.write.parquet("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/parquet/nation")
+
+   val schemaSupplier = StructType(Array( StructField("s_suppkey",IntegerType,true),StructField("s_name",StringType,true), StructField("s_address",StringType,true), StructField("s_nationkey",IntegerType,true), StructField("s_phone",StringType,true), StructField("s_acctbal",FloatType,true),  StructField("s_comment",StringType,true)))
+   val supplierDF = spark.read.schema(schemaSupplier).option("header","false").option("delimiter","|").csv("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/rawData/supplier/*")
+        supplierDF.write.parquet("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/parquet/supplier")
+   
+   val schemaCustomer = StructType(Array( StructField("c_custkey",IntegerType,true),StructField("c_name",StringType,true), StructField("c_address",StringType,true), StructField("c_nationkey",IntegerType,true), StructField("c_phone",StringType,true), StructField("c_acctbal",FloatType,true),  StructField("c_mktsegment",StringType,true), StructField("c_comment",StringType,true)))
+   val customerDF = spark.read.schema(schemaCustomer).option("header","false").option("delimiter","|").csv("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/rawData/customer/*")
+       customerDF.write.parquet("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/parquet/customer")
+
+    val schemaPartsupp = StructType(Array( StructField("ps_partkey",IntegerType,true),StructField("ps_suppkey",IntegerType,true), StructField("ps_availqty",IntegerType,true), StructField("ps_supplycost",FloatType,true),   StructField("ps_comment",StringType,true)))
+    val partsuppDF = spark.read.schema(schemaPartsupp).option("header","false").option("delimiter","|").csv("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/rawData/partsupp/*")
+    partsuppDF.write.parquet("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/parquet/partsupp")
+
+   val schemaPart = StructType(Array( StructField("p_partkey",IntegerType,true),StructField("p_name",StringType,true), StructField("p_mfgr",StringType,true), StructField("p_brand",StringType,true),   StructField("p_type",StringType,true) , StructField("p_size",StringType,true) , StructField("p_container",StringType,true) , StructField("p_retailprice",FloatType,true) , StructField("p_comment",StringType,true)))
+   val partDF = spark.read.schema(schemaPart).option("header","false").option("delimiter","|").csv("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/rawData/part/*")
+       partDF.write.parquet("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/parquet/part")
+	
+    val schemaOrders = StructType(Array( StructField("o_orderkey",LongType,true),StructField("o_custkey",IntegerType,true), StructField("o_orderstatus",StringType,true), StructField("o_totalprice",FloatType,true),   StructField("o_orderdate",StringType,true) , StructField("o_orderpriority",StringType,true) , StructField("o_clerk",StringType,true) , StructField("o_shippriority",IntegerType,true) , StructField("o_comment",StringType,true)))
+    val ordersDF = spark.read.schema(schemaOrders).option("header","false").option("delimiter","|").csv("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/rawData/orders/*")
+       ordersDF.write.parquet("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/parquet/orders")
+
+   val schemaLineitem = StructType(Array( StructField("l_orderkey",LongType,true),StructField("l_partkey",IntegerType,true), StructField("l_suppkey",IntegerType,true), StructField("l_linenumber",LongType,true),   StructField("l_quantity",FloatType,true) , StructField("l_extendedprice",FloatType,true) , StructField("l_discount",FloatType,true) , StructField("l_tax",FloatType,true), StructField("l_returnflag",StringType,true) , StructField("l_linestatus",StringType,true) , StructField("l_shipdate",StringType,true) , StructField("l_commitdate",StringType,true) , StructField("l_receiptdate",StringType,true) , StructField("l_shipinstruct",StringType,true) , StructField("l_shipmode",StringType,true) , StructField("l_comment",StringType,true)))
+   val lineitemDF = spark.read.schema(schemaLineitem).option("header","false").option("delimiter","|").csv("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/rawData/lineitem/*")
+        lineitemDF.write.parquet("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/parquet/lineitem")
+
+  
+System.exit(0)

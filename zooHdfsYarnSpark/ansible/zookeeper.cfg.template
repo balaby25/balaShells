@@ -1,0 +1,8 @@
+tickTime=2000
+initLimit=10
+syncLimit=5
+dataDir=/scratch/balakcha/cluster_confs/zookeeper/dataDir
+clientPort=2181
+server.1=swarm011:2888:3888
+server.2=swarm012:2888:3888
+server.3=swarm013:2888:3888

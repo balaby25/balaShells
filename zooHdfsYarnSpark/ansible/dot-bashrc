@@ -1,0 +1,10 @@
+export JAVA_HOME="/scratch/balakcha/java"
+export CLUSTER_CONF_DIR="/scratch/balakcha/cluster_confs"
+export ZOOKEEPER_HOME="/scratch/balakcha/zookeeper"
+export ZOOKEEPER_CONF_DIR="/scratch/balakcha/cluster_confs/zookeeper"
+export HADOOP_HOME="/scratch/balakcha/hadoop"
+export HADOOP_CONF_DIR="/scratch/balakcha/cluster_confs/hadoop"
+export SPARK_HOME="/scratch/balakcha/spark"
+export SPARK_CONF_DIR="/scratch/balakcha/cluster_confs/spark"
+export SPARK_MASTER_HOST=swarm014
+export PATH=$JAVA_HOME/bin:$HADOOP_HOME/bin:$SPARK_HOME/bin:$ZOOKEEPER_HOME/bin:/usr/lib64/qt-3.3/bin:/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin:/opt/ibutils/bin:/sbin:/usr/sbin

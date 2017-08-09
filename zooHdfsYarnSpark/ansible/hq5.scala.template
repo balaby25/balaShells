@@ -1,0 +1,113 @@
+package com.oracle.tpch1gspark
+
+import org.apache.spark._
+import org.apache.spark.SparkContext._
+import org.apache.spark.sql._
+import scala.io.Source
+import java.nio.charset.CodingErrorAction
+import scala.io.Codec
+import org.apache.spark.sql.functions._
+import scala.collection.mutable.ArrayBuffer
+
+object hq5 {
+  
+   def main(args: Array[String]) {
+    
+     // Use new SparkSession interface in Spark 2.0
+     val spark = SparkSession
+      .builder
+      .appName("hq5")
+      .getOrCreate()
+     
+     spark.sparkContext.setLogLevel("WARN")
+      
+     import spark.implicits._
+    
+     val lineitems = spark.sqlContext.read.parquet("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/parquet/lineitem/")
+
+     lineitems.createOrReplaceTempView("loadlineitem")
+     val LoadLi = spark.sql("SELECT l_suppkey , l_orderkey,  l_extendedprice, l_discount   FROM loadlineitem")
+     LoadLi.cache()
+     LoadLi.createOrReplaceTempView("lineitem")
+
+     val customers = spark.sqlContext.read.parquet("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/parquet/customer/")
+     customers.createOrReplaceTempView("loadcustomer")
+     val LoadCu = spark.sql("SELECT c_custkey, c_nationkey FROM loadcustomer")
+     LoadCu.cache()
+     LoadCu.createOrReplaceTempView("customer")
+
+     val orders = spark.sqlContext.read.parquet("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/parquet/orders/")
+     orders.createOrReplaceTempView("loadorder")
+     val LoadOr = spark.sql("SELECT o_orderkey, o_custkey, o_orderdate FROM loadorder")
+     LoadOr.cache()
+     LoadOr.createOrReplaceTempView("orders")
+
+     val suppliers = spark.sqlContext.read.parquet("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/parquet/supplier/")
+     suppliers.createOrReplaceTempView("loadsupplier")
+     val LoadSu = spark.sql("SELECT s_suppkey , s_nationkey FROM loadsupplier")
+     LoadSu.cache()
+     LoadSu.createOrReplaceTempView("supplier")
+
+     val nations = spark.sqlContext.read.parquet("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/parquet/nation/")
+     nations.createOrReplaceTempView("loadnation")
+ 
+     val LoadNa = spark.sql("SELECT n_name, n_nationkey, n_regionkey FROM loadnation")
+     LoadNa.cache()
+     LoadNa.createOrReplaceTempView("nation")
+
+     val regions = spark.sqlContext.read.parquet("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/parquet/region/")
+     regions.createOrReplaceTempView("loadregion")
+     val LoadRe = spark.sql("SELECT r_name, r_regionkey FROM loadregion")
+     LoadRe.cache()
+     LoadRe.createOrReplaceTempView("region")
+
+    
+     var outfile = "hdfs://$namenode_port/spark/scalaoutput/$tpch_workload_size/outs"
+
+     var printTimes = "hq5 output and elapsed times \n"
+
+   
+    
+
+     for (i <- 1 until 51) {
+
+       outfile = outfile + i;
+       printTimes = "iteration :" + i + "\n\n" ;
+
+       val hq5 = spark.sql("""SELECT n_name, sum(l_extendedprice * (1 - l_discount)) as revenue 
+                              from customer, orders, lineitem, supplier, nation, region where c_custkey = o_custkey	and l_orderkey = o_orderkey and l_suppkey = s_suppkey	and c_nationkey = s_nationkey 	and s_nationkey = n_nationkey	and n_regionkey = r_regionkey 	and r_name = 'ASIA'	and o_orderdate >= date '1994-01-01' 	and o_orderdate < date '1995-01-01'  group by n_name order by revenue""")
+
+       val hq5StartTime =  java.lang.System.currentTimeMillis();
+       val hq5Results = hq5.collect()
+       val hq5EndTime =  java.lang.System.currentTimeMillis();
+    
+    
+       val results2: Array[Array[Any]] = hq5Results.map { row =>
+       val nName = row.get(0)
+       val tRevenue = row.get(1)
+       Array(nName, tRevenue)
+       }
+
+       val hq5format =  "%s , %.4f \n"
+
+
+       for (printResults <- results2 ) {
+          val tName = printResults(0)
+          val tRev = printResults(1)
+      
+          val resRow = hq5format.format(tName , tRev )
+      
+          printTimes = printTimes + " " + resRow     
+       }
+
+       val printTimes2 = ("\n Iteration :" + i +  " Qry Elapsed milliseconds : " + {hq5EndTime - hq5StartTime} + "\n\n" )
+       printTimes = printTimes +  printTimes2
+       spark.sparkContext.parallelize(Seq(printTimes),1).saveAsTextFile(outfile)
+       outfile = "hdfs://$namenode_port/spark/scalaoutput/$tpch_workload_size/outs"
+     } 
+
+     spark.stop()
+
+   }
+
+}

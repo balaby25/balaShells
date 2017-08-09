@@ -1,0 +1,8 @@
+---
+- hosts: spark
+  tasks:
+  - name: prepare .bashrc
+    copy: 
+      src: dot-bashrc
+      dest: ~/.bashrc
+      backup: yes

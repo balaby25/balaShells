@@ -1,0 +1,25 @@
+# Default system properties included when running spark-submit.
+# This is useful for setting default environmental settings.
+
+# Example:
+# spark.master                     spark://master:7077
+# spark.driver.memory              5g
+# spark.executor.extraJavaOptions  -XX:+PrintGCDetails -Dkey=value -Dnumbers="one two three"
+spark.eventLog.enabled           true
+spark.serializer                 org.apache.spark.serializer.KryoSerializer
+spark.history.ui.port    18090
+spark.logConf true
+spark.memory.fraction 0.4
+spark.rpc.askTimeout                6000s
+spark.rpc.lookupTimeout            3000s
+spark.driver.maxResultSize        20g
+spark.rdd.compress                   true
+spark.core.connection.ack.wait.timeout 600
+spark.rpc.message.maxSize  500
+spark.shuffle.io.maxRetries 4
+spark.shuffle.compress              true
+spark.shuffle.file.buffer             128k
+spark.shuffle.spill.compress       true
+spark.shuffle.spill                     true 
+spark.dynamicAllocation.enabled false
+spark.shuffle.blockTransferService nio

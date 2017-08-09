@@ -1,0 +1,98 @@
+package com.oracle.tpch1gspark
+
+import org.apache.spark._
+import org.apache.spark.SparkContext._
+import org.apache.spark.sql._
+import scala.io.Source
+import java.nio.charset.CodingErrorAction
+import scala.io.Codec
+import org.apache.spark.sql.functions._
+import scala.collection.mutable.ArrayBuffer
+
+object hq1 {
+
+   def main(args: Array[String]) {
+
+     // Use new SparkSession interface in Spark 2.0
+     val spark = SparkSession
+      .builder
+      .appName("hq1")
+      .getOrCreate()
+
+     import spark.implicits._
+
+     val lineitems = spark.sqlContext.read.parquet("hdfs://$namenode_port/hive/warehouse/$tpch_workload_size/parquet/lineitem/")
+
+     lineitems.createOrReplaceTempView("loadlineitem")
+
+     val LoadLi = spark.sql("SELECT l_returnFlag , l_lineStatus, l_quantity , l_extendedprice, l_discount ,  l_tax, l_shipdate  FROM loadlineitem")
+     LoadLi.cache()
+     LoadLi.createOrReplaceTempView("lineitem")
+
+     var outfile = "hdfs://$namenode_port/spark/scalaoutput/$tpch_workload_size/outs"
+     var printTimes = "initializing printTimes"
+
+
+
+     for (i <- 1 until 51) {
+       outfile = outfile + i;
+       printTimes = "iteration :" + i + "\n\n" ;
+
+       val hq1 = spark.sql("""SELECT l_returnFlag , l_lineStatus, sum(l_quantity) , 
+                                    sum(l_extendedprice),sum(l_extendedprice*(1-l_discount)) ,  
+                                    sum(l_extendedprice*(1-l_discount)*(1+l_tax)), avg(l_quantity), 
+                                    avg(l_extendedprice), avg(l_discount) , count(*) 
+                              FROM lineitem  
+                              WHERE l_shipdate <= '1998-09-02' 
+                              GROUP BY l_returnFlag , l_lineStatus order by l_returnflag, l_linestatus""")
+
+       val hq1StartTime =  java.lang.System.currentTimeMillis();
+       val hq1Results = hq1.collect()
+       val hq1EndTime =  java.lang.System.currentTimeMillis();
+
+       val results2: Array[Array[Any]] = hq1Results.map { row =>
+       val tRetFlag = row.get(0)
+       val tLineStatus = row.get(1)
+       val tSumQty = row.get(2)
+       val tBasePrice = row.get(3)
+       val tDiscPrice = row.get(4)
+       val tSumCharge = row.get(5)
+       val tAvgQty  = row.get(6)
+       val tAvgPrice = row.get(7)
+       val tAvgDisc = row.get(8)
+       val tCount = row.get(9)
+       Array(tRetFlag, tLineStatus, tSumQty, tBasePrice, tDiscPrice, tSumCharge, tAvgQty, tAvgPrice, tAvgDisc, tCount)
+       }
+
+     val hq1format =  "%s , %s , %.4f , %f , %f , %f , %f , %.4f , %f , %d \n"
+
+
+     for (printResults <- results2 ) {
+       val tRetFlag = printResults(0)
+       val tLineStatus = printResults(1)
+       val tSumQty = printResults(2)
+       val tBasePrice = printResults(3)
+       val tDiscPrice = printResults(4)
+       val tSumCharge = printResults(5)
+       val tAvgQty  = printResults(6)
+       val tAvgPrice = printResults(7)
+       val tAvgDisc = printResults(8)
+       val tCount = printResults(9)
+
+       val resRow = hq1format.format(tRetFlag , tLineStatus , tSumQty , tBasePrice , tDiscPrice , tSumCharge , tAvgQty , tAvgPrice , tAvgDisc , tCount)
+
+       printTimes = printTimes + " " + resRow
+       }
+
+     val printTimes2 = ("\n Iteration :" + i +  " Qry Elapsed milliseconds : " + {hq1EndTime - hq1StartTime} + "\n\n" )
+     printTimes = printTimes +  printTimes2
+     spark.sparkContext.parallelize(Seq(printTimes),1).saveAsTextFile(outfile)
+     outfile = "hdfs://$namenode_port/spark/scalaoutput/$tpch_workload_size/outs"
+
+     }
+     spark.stop()
+
+
+   }
+
+}

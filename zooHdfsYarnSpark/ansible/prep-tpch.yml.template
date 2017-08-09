@@ -1,0 +1,78 @@
+---
+- hosts: namenode
+  environment:
+      JAVA_HOME: $JAVA_HOME
+      HADOOP_HOME: $HADOOP_HOME
+      HADOOP_CONF_DIR: $HADOOP_CONF_DIR
+      SPARK_HOME: $SPARK_HOME
+      SPARK_CONF_DIR: $SPARK_CONF_DIR
+      LAUNCH_DIR:  $LAUNCH_DIR
+  tasks:
+  - name: create hdfs pre requisite directories
+    command: "{{ item }} "
+    with_items:
+    - $HADOOP_HOME/bin/hdfs dfs -mkdir /hive
+    - $HADOOP_HOME/bin/hdfs dfs -mkdir /hive/warehouse
+    - $HADOOP_HOME/bin/hdfs dfs -mkdir /hive/warehouse/$TPCH_SCHEMA
+    - $HADOOP_HOME/bin/hdfs dfs -mkdir /hive/warehouse/$TPCH_SCHEMA/parquet
+    - $HADOOP_HOME/bin/hdfs dfs -mkdir /hive/warehouse/$TPCH_SCHEMA/rawData
+    - $HADOOP_HOME/bin/hdfs dfs -setrep -R 1 /hive/warehouse/$TPCH_SCHEMA/rawData
+    - $HADOOP_HOME/bin/hdfs dfs -mkdir /hive/warehouse/$TPCH_SCHEMA/rawData/customer
+    - $HADOOP_HOME/bin/hdfs dfs -mkdir /hive/warehouse/$TPCH_SCHEMA/rawData/lineitem
+    - $HADOOP_HOME/bin/hdfs dfs -mkdir /hive/warehouse/$TPCH_SCHEMA/rawData/nation
+    - $HADOOP_HOME/bin/hdfs dfs -mkdir /hive/warehouse/$TPCH_SCHEMA/rawData/orders
+    - $HADOOP_HOME/bin/hdfs dfs -mkdir /hive/warehouse/$TPCH_SCHEMA/rawData/part
+    - $HADOOP_HOME/bin/hdfs dfs -mkdir /hive/warehouse/$TPCH_SCHEMA/rawData/partsupp
+    - $HADOOP_HOME/bin/hdfs dfs -mkdir /hive/warehouse/$TPCH_SCHEMA/rawData/region
+    - $HADOOP_HOME/bin/hdfs dfs -mkdir /hive/warehouse/$TPCH_SCHEMA/rawData/supplier
+    - $HADOOP_HOME/bin/hdfs dfs -mkdir /spark/scalaoutput/
+    - $HADOOP_HOME/bin/hdfs dfs -mkdir /spark/scalaoutput/$TPCH_SCHEMA/
+  - name: copy source csv files to hdfs
+    command: "{{ item }} "
+    with_items:
+    - $HADOOP_HOME/bin/hdfs dfs -copyFromLocal /net/ol-rapidpeta1/export/rapid_data/workload_src/tpch/data_$SCHEMASIZE/customer.tbl  /hive/warehouse/$TPCH_SCHEMA/rawData/customer/
+    - $HADOOP_HOME/bin/hdfs dfs -copyFromLocal /net/ol-rapidpeta1/export/rapid_data/workload_src/tpch/data_$SCHEMASIZE/lineitem.tbl  /hive/warehouse/$TPCH_SCHEMA/rawData/lineitem/
+    - $HADOOP_HOME/bin/hdfs dfs -copyFromLocal /net/ol-rapidpeta1/export/rapid_data/workload_src/tpch/data_$SCHEMASIZE/nation.tbl  /hive/warehouse/$TPCH_SCHEMA/rawData/nation/
+    - $HADOOP_HOME/bin/hdfs dfs -copyFromLocal /net/ol-rapidpeta1/export/rapid_data/workload_src/tpch/data_$SCHEMASIZE/orders.tbl  /hive/warehouse/$TPCH_SCHEMA/rawData/orders/
+    - $HADOOP_HOME/bin/hdfs dfs -copyFromLocal /net/ol-rapidpeta1/export/rapid_data/workload_src/tpch/data_$SCHEMASIZE/part.tbl  /hive/warehouse/$TPCH_SCHEMA/rawData/part/
+    - $HADOOP_HOME/bin/hdfs dfs -copyFromLocal /net/ol-rapidpeta1/export/rapid_data/workload_src/tpch/data_$SCHEMASIZE/partsupp.tbl  /hive/warehouse/$TPCH_SCHEMA/rawData/partsupp/
+    - $HADOOP_HOME/bin/hdfs dfs -copyFromLocal /net/ol-rapidpeta1/export/rapid_data/workload_src/tpch/data_$SCHEMASIZE/region.tbl  /hive/warehouse/$TPCH_SCHEMA/rawData/region/
+    - $HADOOP_HOME/bin/hdfs dfs -copyFromLocal /net/ol-rapidpeta1/export/rapid_data/workload_src/tpch/data_$SCHEMASIZE/supplier.tbl  /hive/warehouse/$TPCH_SCHEMA/rawData/supplier/
+- hosts: spark
+  environment:
+      JAVA_HOME: $JAVA_HOME
+      HADOOP_HOME: $HADOOP_HOME
+      HADOOP_CONF_DIR: $HADOOP_CONF_DIR
+      SPARK_HOME: $SPARK_HOME
+      SPARK_CONF_DIR: $SPARK_CONF_DIR
+      LAUNCH_DIR:  $LAUNCH_DIR
+  tasks:
+  - name: create needed directories
+    shell: mkdir -p $LAUNCH_DIR
+  - name:  copy pargquet-gens.scala to then run from spark-shell 
+    copy: src={{ item.src }} dest={{ item.dest }}
+    with_items:
+        - { src: 'parquet-gens.scala', dest: $LAUNCH_DIR  }
+        - { src: 'hq1.jar', dest: $LAUNCH_DIR   }
+        - { src: 'hq5.jar', dest: $LAUNCH_DIR  }
+        - { src: 'spark-submit-hq1.py', dest: $LAUNCH_DIR , mode=0755 }
+        - { src: 'spark-submit-hq5.py', dest: $LAUNCH_DIR , mode=0755 }
+        - { src: 'config.cfg', dest: $LAUNCH_DIR , mode=0755 }
+- hosts: sparkMaster
+  environment:
+      JAVA_HOME: $JAVA_HOME
+      HADOOP_HOME: $HADOOP_HOME
+      HADOOP_CONF_DIR: $HADOOP_CONF_DIR
+      SPARK_HOME: $SPARK_HOME
+      SPARK_CONF_DIR: $SPARK_CONF_DIR
+      LAUNCH_DIR:  $LAUNCH_DIR
+  tasks:
+  - name: convert csv to parquet
+    command: "{{ item }} "
+    with_items:
+    - $SPARK_HOME/bin/spark-shell   --driver-memory 10G --executor-memory 15G -i $LAUNCH_DIR/parquet-gens.scala
+  - name: run hq1  and hq5
+    command: "{{ item }} "
+    with_items:
+    - $LAUNCH_DIR/spark-submit-hq1.py
+    - $LAUNCH_DIR/spark-submit-hq5.py

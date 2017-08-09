@@ -1,0 +1,107 @@
+#!/scratch/balakcha/python/bin/python2.7
+
+import time
+import re
+import os
+import sys
+import io
+import ConfigParser
+import threading
+import datetime
+import subprocess
+import shutil
+import xml.etree.ElementTree as ET
+
+config = ConfigParser.RawConfigParser()
+config = ConfigParser.ConfigParser()
+configPath = os.getcwd()
+config.read(configPath + '/config.cfg')
+
+DEPLOYMENT_DIR = config.get('environment', 'DEPLOYMENT_DIR')
+SOURCE_DIR = config.get('environment', 'SOURCE_DIR')
+CLUSTER_CONF_DIR = config.get('environment', 'CLUSTER_CONF_DIR')
+CLUSTER_LOGS_DIR = config.get('environment', 'CLUSTER_LOGS_DIR')
+LAUNCH_DIR = config.get('environment', 'LAUNCH_DIR')
+DEFAULT_JAVA_HOME = config.get('environment', 'DEFAULT_JAVA_HOME')
+JAVA_HOME = config.get('environment', 'JAVA_HOME')
+ZOOKEEPER_HOME = config.get('environment', 'ZOOKEEPER_HOME')
+HADOOP_HOME = config.get('environment', 'HADOOP_HOME')
+SPARK_HOME = config.get('environment', 'SPARK_HOME')
+ZOOKEEPER_CONF_DIR = config.get('environment', 'ZOOKEEPER_CONF_DIR')
+HADOOP_CONF_DIR = config.get('environment', 'HADOOP_CONF_DIR')
+SPARK_CONF_DIR = config.get('environment', 'SPARK_CONF_DIR')
+ZOO_DATA_DIR = config.get('zoo', 'ZOO_DATA_DIR')
+ZOO_LOG_DIR = config.get('zoo', 'ZOO_LOG_DIR')
+HDFS_DATA = config.get('hdfs', 'HDFS_DATA')
+HDFS_LOG_DIR = config.get('hdfs', 'HDFS_LOG_DIR')
+#print "read from config.cfg. default_java_hjome is : " +  DEFAULT_JAVA_HOME  + '\n'
+
+def justPing():
+    print "[INFO ] only pinging the hosts ."
+    cmd="ansible -i hosts.ini myCluster  -m ping"
+    os.system(cmd)
+
+def sparkSubmit():
+
+    cmd="$HADOOP_HOME/bin/hdfs dfs -mkdir /spark/scalaoutput/$TPCH_SCHEMA/out4rm2succeed"
+    os.system(cmd)
+    cmd="$HADOOP_HOME/bin/hdfs dfs -rm -r /spark/scalaoutput/$TPCH_SCHEMA/out*"
+    os.system(cmd)
+
+    print "[INFO ] spark submit "
+    cmd="""    $SPARK_HOME/bin/spark-submit --verbose    \
+    --deploy-mode cluster \
+    --master spark://$spark_endpoint  \
+    --driver-memory 10G  --executor-memory 10G   \
+    --conf \"spark.executor.extraJavaOptions=-XX:+UseG1GC \" \
+    $LAUNCH_DIR/$qry_id.jar
+"""
+    fireSparkSubmit = subprocess.Popen(cmd, shell=True).wait()
+    print("fireSparkSubmit is : " + str(fireSparkSubmit))
+
+    #  count loop to wait till the 50 executions are done
+    # we are checking for 51 because,  50 iterations  creates 50 outdirs and the parent directory
+    iter_count_v=0
+    while iter_count_v < 51 :
+         iteration_hdfs_out = subprocess.check_output("hdfs dfs -count -q /spark/scalaoutput/$TPCH_SCHEMA", shell=True)
+         print (iteration_hdfs_out)
+         iter_count = iteration_hdfs_out.split()
+         iter_count_v = int(iter_count[-4])
+         print ("iter_count[-4] is : " +  str(iter_count_v) )
+         time.sleep(5)
+
+
+    ts=datetime.datetime.now().strftime('%Y%m%d%H%M')
+    sparkScalaOuts_dir="$LAUNCH_DIR/sparkScalaOuts/" + ts
+    cmd="mkdir -p " + sparkScalaOuts_dir
+    os.system(cmd)
+    cmd="$HADOOP_HOME/bin/hdfs dfs -copyToLocal /spark/scalaoutput/$TPCH_SCHEMA/outs* " + sparkScalaOuts_dir
+    os.system(cmd)
+  
+    #ts="201707290852"
+    pattern = re.compile("Elapsed")
+    count=1
+    # we are checking 51 here, because we do only 50 iterations and hence there are only 50 outfiles
+    while  count < 51 :
+      #print count
+      curr_dir="$LAUNCH_DIR/sparkScalaOuts/" + ts + "/outs" + str(count) + "/"
+      for filename in os.listdir(curr_dir):
+        #if filename.beginswith("part-"):
+        if filename.startswith("part-"):
+          curr_file = curr_dir + filename
+          #print (curr_file)
+          for i, line in enumerate(open(curr_file)):
+            for match in re.finditer(pattern, line):
+              #print 'Found on line %s: %s' % (i+1, match.groups())
+              result = re.split(':',line)
+              print ((result[2].rstrip()) + ','),
+      #os.system(cmd)
+      count += 1
+
+    print "if you want, all outfiles are here ==> $LAUNCH_DIR/sparkScalaOuts/ " + ts
+   
+
+if __name__ == "__main__":
+    # by default do nothing
+    ts=datetime.datetime.now().strftime('%Y-%m-%d_%H:%M')
+    sparkSubmit()

@@ -1,0 +1,12 @@
+---
+- hosts: myCluster
+  gather_facts: no
+  environment:
+      HADOOP_HOME:  "/scratch/balakcha/hadoop"
+      HADOOP_CONF_DIR:  "/scratch/balakcha/cluster_confs/hadoop"
+  tasks:
+  - name: check space df -h 
+    shell: df -hP /scratch
+    register: dfChk
+ 
+  - debug: var=dfChk.stdout_lines
